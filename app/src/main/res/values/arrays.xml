@@ -9,4 +9,20 @@
         <item>reply</item>
         <item>reply_all</item>
     </string-array>
+
+    <!--UI Color Preference -->
+    <string-array name="ui_color_entries">
+        <item>Default</item>
+        <item>Blue</item>
+        <item>Green</item>
+        <item>Red</item>
+    </string-array>
+
+    <string-array name="ui_color_values">
+        <item>default</item>
+        <item>blue</item>
+        <item>green</item>
+        <item>red</item>
+    </string-array>
+
 </resources>

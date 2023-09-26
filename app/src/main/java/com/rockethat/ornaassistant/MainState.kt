@@ -1,5 +1,6 @@
 package com.rockethat.ornaassistant
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,8 +17,10 @@ import java.time.LocalDateTime
 import java.util.*
 import com.rockethat.ornaassistant.overlays.SessionOverlay
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.net.Uri
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.preference.PreferenceManager
@@ -403,7 +406,19 @@ class MainState(
                 .setContentText(inputData.getString("description"))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
 
-            with(NotificationManagerCompat.from(context)) {
+            with(NotificationManagerCompat.from(context.applicationContext)) {
+                if (ActivityCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    // You can handle the case where the permission is not granted here,
+                    // e.g., by requesting permissions.
+                    // Then, you should return a failure result.
+                    // See the documentation for ActivityCompat#requestPermissions.
+                    return Result.failure()
+                }
+
                 notify(101, builder.build())
             }
 

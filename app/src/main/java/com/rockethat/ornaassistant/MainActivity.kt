@@ -1,5 +1,6 @@
 package com.rockethat.ornaassistant
 
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
@@ -13,7 +14,6 @@ import android.provider.Settings
 import android.text.TextUtils.SimpleStringSplitter
 import android.util.Log
 import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
@@ -21,8 +21,11 @@ import androidx.preference.PreferenceManager
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
 import com.google.android.material.tabs.TabLayout.OnTabSelectedListener
+import com.rockethat.ornaassistant.R
+import com.rockethat.ornaassistant.SettingsActivity
 import com.rockethat.ornaassistant.ui.fragment.FragmentAdapter
 import com.rockethat.ornaassistant.ui.fragment.MainFragment
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -33,8 +36,8 @@ class MainActivity : AppCompatActivity() {
     private val ACCESSIBILITY_SERVICE_NAME = "laukas service"
 
     // Define the permission request codes
-    private val accessibilityPermissionRequestCode = 123
-    private val drawOverOtherAppsPermissionRequestCode = 124
+    private val accessibilityPermissionRequestCode = "android.permission.BIND_ACCESSIBILITY_SERVICE"
+    private val drawOverOtherAppsPermissionRequestCode = "android.permission.SYSTEM_ALERT_WINDOW"
 
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
 
@@ -42,10 +45,27 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize requestPermissionLauncher within onCreate
+// Initialize requestPermissionLauncher within onCreate
+        val requestPermissionCode = accessibilityPermissionRequestCode // Set the initial permission code
+
         requestPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
                 // Handle permission result here if needed
+                if (isGranted) {
+                    when (requestPermissionCode) { // Use the permission code directly
+                        accessibilityPermissionRequestCode -> {
+                            // Accessibility Service permission granted
+                            // Check and request Draw Over Other Apps permission
+                            if (!isDrawOverOtherAppsEnabled()) {
+                                requestDrawOverOtherAppsPermission()
+                            }
+                        }
+                        drawOverOtherAppsPermissionRequestCode -> {
+                            // Draw Over Other Apps permission granted
+                            // You can handle it here if needed
+                        }
+                    }
+                }
             }
 
         tableLayout = findViewById(R.id.tab_layout)
@@ -115,19 +135,6 @@ class MainActivity : AppCompatActivity() {
         if (!isAccessibilityEnabled()) {
             requestAccessibilityPermission()
         }
-
-        // Check and request Draw Over Other Apps permission
-        if (!isDrawOverOtherAppsEnabled()) {
-            requestDrawOverOtherAppsPermission()
-        }
-
-        when (tableLayout.selectedTabPosition) {
-            0 -> {
-                if (adapter.frags.size >= 1) {
-                    (adapter.frags[0] as? MainFragment)?.drawWeeklyChart()
-                }
-            }
-        }
     }
 
     private fun requestAccessibilityPermission() {
@@ -138,13 +145,14 @@ class MainActivity : AppCompatActivity() {
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             // Permission is already granted
-            return
+            // Check and request Draw Over Other Apps permission
+            if (!isDrawOverOtherAppsEnabled()) {
+                requestDrawOverOtherAppsPermission()
+            }
+        } else {
+            // Request the Accessibility Service permission
+            requestPermissionLauncher.launch(accessibilityPermissionRequestCode)
         }
-
-        // Request the Accessibility Service permission
-        requestPermissionLauncher.launch(
-            android.Manifest.permission.BIND_ACCESSIBILITY_SERVICE
-        )
     }
 
     private fun requestDrawOverOtherAppsPermission() {
@@ -157,7 +165,7 @@ class MainActivity : AppCompatActivity() {
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
-            requestPermissionLauncher.launch(intent.toString())
+            requestPermissionLauncher.launch(drawOverOtherAppsPermissionRequestCode)
         }
     }
 
