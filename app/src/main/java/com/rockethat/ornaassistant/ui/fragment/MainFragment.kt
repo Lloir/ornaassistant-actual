@@ -1,62 +1,42 @@
 package com.rockethat.ornaassistant.ui.fragment
 
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import com.rockethat.ornaassistant.R
 import android.widget.Button
 import androidx.annotation.RequiresApi
+import androidx.fragment.app.Fragment
+import androidx.preference.PreferenceManager
 import com.github.mikephil.charting.charts.BarChart
 import com.github.mikephil.charting.components.AxisBase
 import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.*
+import com.github.mikephil.charting.data.BarData
+import com.github.mikephil.charting.data.BarDataSet
+import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.formatter.ValueFormatter
+import com.rockethat.ornaassistant.R
 import com.rockethat.ornaassistant.db.DungeonVisitDatabaseHelper
+import com.rockethat.ornaassistant.DungeonVisit
 import java.time.LocalDate
 
-import android.content.res.Resources.Theme
-import android.net.Uri
+import android.content.res.Configuration
 
-import android.util.TypedValue
-import androidx.preference.PreferenceManager
-import com.google.android.material.color.MaterialColors
-import com.rockethat.ornaassistant.DungeonVisit
-
-
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [Main.newInstance] factory method to
- * create an instance of this fragment.
- */
 class MainFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
+
     private lateinit var mDb: DungeonVisitDatabaseHelper
     private lateinit var mSharedPreference: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-        mDb = DungeonVisitDatabaseHelper(context as Context)
-        mSharedPreference = PreferenceManager.getDefaultSharedPreferences(context)
+        mDb = DungeonVisitDatabaseHelper(requireContext())
+        mSharedPreference = PreferenceManager.getDefaultSharedPreferences(requireContext())
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -73,30 +53,29 @@ class MainFragment : Fragment() {
         }
 
         donate.setOnClickListener {
-            val uri: Uri =
-                Uri.parse("https://www.paypal.com/donate/?business=L7Q94HMXMHA5A&no_recurring=0&item_name=Orna+assistant+development&currency_code=EUR") // missing 'http://' will cause crashed
-
+            val uri = Uri.parse("https://www.paypal.com/donate/?business=L7Q94HMXMHA5A&no_recurring=0&item_name=Orna+assistant+development&currency_code=EUR")
             val intent = Intent(Intent.ACTION_VIEW, uri)
             startActivity(intent)
         }
 
         drawWeeklyChart(view)
 
-        // Inflate the layout for this fragment
         return view
     }
 
-    class WeekAxisFormatter(private val startDay: Int) : ValueFormatter() {
+    inner class WeekAxisFormatter(private val startDay: Int) : ValueFormatter() {
         private val days = arrayOf("Mo", "Tu", "Wed", "Th", "Fr", "Sa", "Su")
+
         override fun getAxisLabel(value: Float, axis: AxisBase?): String {
             var index = startDay - 1 + value.toInt()
-            if (index > 6)
+            if (index > 6) {
                 index -= 7
+            }
             return days.getOrNull(index) ?: value.toString()
         }
     }
 
-    class IntegerFormatter() : ValueFormatter() {
+    inner class IntegerFormatter : ValueFormatter() {
         override fun getFormattedValue(value: Float): String {
             return value.toInt().toString()
         }
@@ -135,10 +114,13 @@ class MainFragment : Fragment() {
             eOrns.add(BarEntry(i.toFloat(), orns))
         }
 
-        var textColor = Color.BLACK
-        if (requireContext().resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES) {
-            textColor = Color.LTGRAY
+        val textColor = if (requireContext().resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES) {
+            Color.LTGRAY
+        } else {
+            Color.BLACK
         }
+
         val sDung = BarDataSet(eDung, "Dungeons")
         val sFailedDung = BarDataSet(eFailedDung, "Failed dungeons")
         val sOrns = BarDataSet(eOrns, "Orns gained (mil)")
@@ -180,25 +162,5 @@ class MainFragment : Fragment() {
         chart.axisRight.textColor = textColor
         chart.legend.textColor = textColor
         chart.invalidate()
-    }
-
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment Main.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            MainFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
-                }
-            }
     }
 }

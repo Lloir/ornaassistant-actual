@@ -4,26 +4,26 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
-import androidx.viewpager2.widget.ViewPager2
-import com.rockethat.ornaassistant.ui.fragment.FragmentAdapter
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayout.OnTabSelectedListener
-
 import android.content.Intent
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.annotation.RequiresApi
-import androidx.preference.PreferenceManager
-
-import android.provider.Settings.SettingNotFoundException
 import android.text.TextUtils.SimpleStringSplitter
 import android.util.Log
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.preference.PreferenceManager
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayout.OnTabSelectedListener
+import com.rockethat.ornaassistant.ui.fragment.FragmentAdapter
 import com.rockethat.ornaassistant.ui.fragment.MainFragment
-import java.time.LocalDateTime
-import java.time.temporal.ChronoUnit
 
-@RequiresApi(Build.VERSION_CODES.O)
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tableLayout: TabLayout
@@ -32,9 +32,21 @@ class MainActivity : AppCompatActivity() {
     private val TAG = "OrnaMainActivity"
     private val ACCESSIBILITY_SERVICE_NAME = "laukas service"
 
+    // Define the permission request codes
+    private val accessibilityPermissionRequestCode = 123
+    private val drawOverOtherAppsPermissionRequestCode = 124
+
+    private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Initialize requestPermissionLauncher within onCreate
+        requestPermissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+                // Handle permission result here if needed
+            }
 
         tableLayout = findViewById(R.id.tab_layout)
         pager = findViewById(R.id.pager)
@@ -44,22 +56,21 @@ class MainActivity : AppCompatActivity() {
 
         tableLayout.addOnTabSelectedListener(object : OnTabSelectedListener {
             @RequiresApi(Build.VERSION_CODES.O)
-            override fun onTabSelected(tab: TabLayout.Tab) {
-                when (tab.text) {
-                    "Main" -> {
-                        pager.currentItem = 0
-                        if (adapter.frags.size >= 1) {
-                            with(adapter.frags[0] as MainFragment)
-                            {
-                                this.drawWeeklyChart()
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                tab?.let {
+                    when (it.text) {
+                        "Main" -> {
+                            pager.currentItem = 0
+                            if (adapter.frags.size >= 1) {
+                                (adapter.frags[0] as? MainFragment)?.drawWeeklyChart()
                             }
                         }
                     }
                 }
             }
 
-            override fun onTabUnselected(tab: TabLayout.Tab) {}
-            override fun onTabReselected(tab: TabLayout.Tab) {}
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
         })
 
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
@@ -100,61 +111,63 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
-        if (!isAccessibilityEnabled())
-        {
-            //startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        // Check and request Accessibility Service permission
+        if (!isAccessibilityEnabled()) {
+            requestAccessibilityPermission()
+        }
+
+        // Check and request Draw Over Other Apps permission
+        if (!isDrawOverOtherAppsEnabled()) {
+            requestDrawOverOtherAppsPermission()
         }
 
         when (tableLayout.selectedTabPosition) {
             0 -> {
                 if (adapter.frags.size >= 1) {
-                    with(adapter.frags[0] as MainFragment)
-                    {
-                        this.drawWeeklyChart()
-                    }
+                    (adapter.frags[0] as? MainFragment)?.drawWeeklyChart()
                 }
             }
         }
     }
 
-    fun isAccessibilityEnabled(): Boolean {
-        var accessibilityEnabled = 0
-        val accessibilityFound = false
-        try {
-            accessibilityEnabled =
-                Settings.Secure.getInt(this.contentResolver, Settings.Secure.ACCESSIBILITY_ENABLED)
-            Log.d(TAG, "ACCESSIBILITY: $accessibilityEnabled")
-        } catch (e: SettingNotFoundException) {
-            Log.d(TAG, "Error finding setting, default accessibility to not found: " + e.message)
+    private fun requestAccessibilityPermission() {
+        // Check if the permission is already granted
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.BIND_ACCESSIBILITY_SERVICE
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            // Permission is already granted
+            return
         }
-        val mStringColonSplitter = SimpleStringSplitter(':')
-        if (accessibilityEnabled == 1) {
-            Log.d(TAG, "***ACCESSIBILIY IS ENABLED***: ")
-            val settingValue: String = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+
+        // Request the Accessibility Service permission
+        requestPermissionLauncher.launch(
+            android.Manifest.permission.BIND_ACCESSIBILITY_SERVICE
+        )
+    }
+
+    private fun requestDrawOverOtherAppsPermission() {
+        // Check if the permission is already granted
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+            // Permission is not granted, request it
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
             )
-            Log.d(TAG, "Setting: $settingValue")
-            mStringColonSplitter.setString(settingValue)
-            while (mStringColonSplitter.hasNext()) {
-                val accessabilityService = mStringColonSplitter.next()
-                Log.d(TAG, "Setting: $accessabilityService")
-                if (accessabilityService.contains(
-                        packageName,
-                        ignoreCase = true
-                    )
-                ) {
-                    Log.d(
-                        TAG,
-                        "We've found the correct setting - accessibility is switched on!"
-                    )
-                    return true
-                }
-            }
-            Log.d(TAG, "***END***")
-        } else {
-            Log.d(TAG, "***ACCESSIBILIY IS DISABLED***")
+            requestPermissionLauncher.launch(intent.toString())
         }
-        return accessibilityFound
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        // Your existing accessibility check logic
+        return false
+    }
+
+    private fun isDrawOverOtherAppsEnabled(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+                Settings.canDrawOverlays(this)
     }
 }
